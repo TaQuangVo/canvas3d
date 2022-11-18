@@ -16,7 +16,7 @@ export default function Home() {
     if(!ctx) return
 
     engin = new Engin(ctx)
-    engin.update(1)
+    engin.update(3300)
 
     return ()=>{
       if(engin)
@@ -32,7 +32,7 @@ export default function Home() {
       </Head>
 
       <main className={styles.main}>
-        <canvas ref={canvas} className={styles.canvas} width="300" height="250"/>
+        <canvas ref={canvas} className={styles.canvas} width="350" height="350"/>
       </main>
     </div>
   )

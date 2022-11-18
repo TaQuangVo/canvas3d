@@ -1,4 +1,15 @@
-import {point, triangle} from "./index"
+export interface point{
+    x:number,
+    y:number,
+    z:number
+}
+export interface triangle{
+    points: [point, point, point],
+    shade?: number
+}
+export interface mesh{
+    tris: Array<triangle>
+}
 
 function multiplyMatrices(m1:number[][], m2:number[][]):number[][] {
     var result:number[][] = [];
@@ -29,7 +40,7 @@ export function pointTimeMatrix(point:point, matrix:number[][]):point{
     
     let ret;
     if(mul[0][3] != 0)
-        ret = [[mul[0][0]/mul[0][3], mul[0][1]/mul[0][3], mul[0][2]/mul[0][3]]]
+        ret = [[mul[0][0]/mul[0][3], mul[0][1]/mul[0][3], mul[0][2]]]
     else
         ret = [[mul[0][0], mul[0][1], mul[0][2]]]
     return matrixToPoint(ret)
@@ -110,4 +121,118 @@ export function normalize(v:point):point{
     y:v.y / l,
     z:v.z / l
     }
+}
+export async function objLoader(url:string):Promise< mesh|null>{
+    const data = await fetch(url)
+    if(data.status != 200){
+        console.log("Cannot load file")
+        return null
+    }
+    if(!data.body){
+        console.log("No data")
+        return null
+    }
+    const reader = data.body.getReader()
+    let content:string = ""
+    let end:boolean
+    do{
+        const {done, value} = await reader.read()
+        const strValue = new TextDecoder("utf-8").decode(value)
+        content += strValue
+        end = done
+    }while(end)
+
+    const lines = content.split("\n")
+    const vertices:point[] = []
+    let mesh:mesh = {
+        tris:[]
+    }
+    for(let i = 0; i < lines.length; i++){
+        if(lines[i][0] === 'v'){
+            const vs = lines[i].split(" ")
+            const vertex:point = {
+                x:parseFloat(vs[1]),
+                y:parseFloat(vs[2]),
+                z:parseFloat(vs[3])}
+            
+            vertices.push(vertex)
+        }
+        if(lines[i][0] === 'f'){
+            const fs = lines[i].split(" ")
+            const p1 = parseInt(fs[1])-1
+            const p2 = parseInt(fs[2])-1
+            const p3 = parseInt(fs[3])-1
+            const triangle:triangle = {
+                points:[
+                    vertices[p1],
+                    vertices[p2],
+                    vertices[p3]
+                ]
+            } 
+            mesh.tris.push(triangle)
+        }
+    }
+    return mesh
+}
+export function meshCube():mesh{
+    return {
+        tris:[
+            {points:[{x:-0.5,y:-0.5,z:-0.5},{x:-0.5,y:0.5,z:-0.5},{x:0.5,y:0.5,z:-0.5}]},
+            {points:[{x:-0.5,y:-0.5,z:-0.5},{x:0.5,y:0.5,z:-0.5},{x:0.5,y:-0.5,z:-0.5}]},
+    
+            {points:[{x:0.5,y:-0.5,z:-0.5},{x:0.5,y:0.5,z:-0.5},{x:0.5,y:0.5,z:0.5}]},
+            {points:[{x:0.5,y:-0.5,z:-0.5},{x:0.5,y:0.5,z:0.5},{x:0.5,y:-0.5,z:0.5}]},
+    
+            {points:[{x:0.5,y:-0.5,z:0.5},{x:0.5,y:0.5,z:0.5},{x:-0.5,y:0.5,z:0.5}]},
+            {points:[{x:0.5,y:-0.5,z:0.5},{x:-0.5,y:0.5,z:0.5},{x:-0.5,y:-0.5,z:0.5}]},
+    
+            {points:[{x:-0.5,y:-0.5,z:0.5},{x:-0.5,y:0.5,z:0.5},{x:-0.5,y:0.5,z:-0.5}]},
+            {points:[{x:-0.5,y:-0.5,z:0.5},{x:-0.5,y:0.5,z:-0.5},{x:-0.5,y:-0.5,z:-0.5}]},
+    
+            {points:[{x:-0.5,y:0.5,z:-0.5},{x:-0.5,y:0.5,z:0.5},{x:0.5,y:0.5,z:0.5}]},
+            {points:[{x:-0.5,y:0.5,z:-0.5},{x:0.5,y:0.5,z:0.5},{x:0.5,y:0.5,z:-0.5}]},
+    
+            {points:[{x:0.5,y:-0.5,z:0.5},{x:-0.5,y:-0.5,z:0.5},{x:-0.5,y:-0.5,z:-0.5}]},
+            {points:[{x:0.5,y:-0.5,z:0.5},{x:-0.5,y:-0.5,z:-0.5},{x:0.5,y:-0.5,z:-0.5}]},
+        ]
+    }
+}
+
+export const buildProjectionMatrix = (a:number, near:number, far:number, fov:number):number[][]=>{
+    const f = 1/Math.tan(fov*0.5/180*Math.PI)
+    const q = far/(far-near)
+    return [
+        [a*f, 0, 0, 0],
+        [0, f, 0, 0],
+        [0, 0, q, 1],
+        [0, 0, -near*q, 0]
+    ]
+}
+export function getAvgZ(tri:triangle):number{
+    let avg = tri.points[0].z+tri.points[1].z+tri.points[2].z;
+    return avg/3
+}
+function swap(tris:triangle[], i:number, j:number){
+    const temp = tris[j]
+    tris[j] = tris[i]
+    tris[i] = temp
+}
+function quickshort(tris:triangle[], start:number, end:number){
+    if(end - start <= 0)
+        return
+
+    const pivotZ = getAvgZ(tris[end])
+    let j = start-1
+    for(let i = start; i< end; i++)
+        if(getAvgZ(tris[i]) > pivotZ)
+            swap(tris, ++j, i)
+    swap(tris, ++j, end)
+    
+    quickshort(tris, start, j-1)
+    quickshort(tris, j+1, end)
+}
+export function sortTriangle(tris:triangle[]){
+    if(tris.length < 2)
+        return
+    quickshort(tris, 0, tris.length-1)
 }
