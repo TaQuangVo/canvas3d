@@ -32,7 +32,7 @@ export default function Home() {
       </Head>
 
       <main className={styles.main}>
-        <canvas ref={canvas} className={styles.canvas} width="350" height="350"/>
+        <canvas ref={canvas} className={styles.canvas} width="550" height="550"/>
       </main>
     </div>
   )
